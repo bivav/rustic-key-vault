@@ -7,6 +7,7 @@ use anyhow::{Context, Result};
 use argon2::password_hash::rand_core::OsRng;
 use argon2::password_hash::SaltString;
 use argon2::{Argon2, PasswordHasher};
+use nix::unistd;
 
 pub struct AppConfig {
     pub username: String,
@@ -21,6 +22,10 @@ impl AppConfig {
             username,
             password: None,
         }
+    }
+
+    pub fn am_i_root() -> bool {
+        unistd::geteuid().is_root()
     }
 }
 
@@ -91,7 +96,10 @@ pub fn create_or_get_master_password() -> Result<String> {
         let argon2 = Argon2::default();
 
         // Hash password to PHC string ($argon2id$v=19$...)
-        let password_hash = argon2.hash_password(password.as_bytes(), &salt).unwrap().to_string();
+        let password_hash = argon2
+            .hash_password(password.as_bytes(), &salt)
+            .unwrap()
+            .to_string();
 
         // Write the hash to the hash file
         fs::write(&hash_file, &password_hash).context("Failed to write hash to file")?;

@@ -1,12 +1,7 @@
 use anyhow::Result;
 use clap::{Arg, Command};
-use nix::unistd;
 
 use rustic_key_vault::AppConfig;
-
-fn am_i_root() -> bool {
-    unistd::geteuid().is_root()
-}
 
 fn main() -> Result<()> {
     let matches = Command::new("rustic_key_vault")
@@ -44,7 +39,7 @@ fn main() -> Result<()> {
         }
         Some(("reset", reset_matches)) => {
             if reset_matches.subcommand_matches("master").is_some() {
-                if am_i_root() {
+                if AppConfig::am_i_root() {
                     println!("System password verified as root.");
                 } else {
                     println!("Failed to verify system password as root. Please run as 'sudo'.");
@@ -56,7 +51,6 @@ fn main() -> Result<()> {
         }
         _ => {
             println!("No subcommand was used");
-            // root privileges required
         }
     }
 
