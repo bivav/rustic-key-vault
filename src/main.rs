@@ -1,10 +1,14 @@
 use anyhow::Result;
 use clap::{Arg, Command};
+use nix::unistd;
 
-use rustic_key_vault::{get_passwords, AppConfig};
+use rustic_key_vault::AppConfig;
+
+fn am_i_root() -> bool {
+    unistd::geteuid().is_root()
+}
 
 fn main() -> Result<()> {
-    // Create a command line where -l will take in login and -p will take in password
     let matches = Command::new("rustic_key_vault")
         .name("Rustic Key Vault")
         .version("0.1.0")
@@ -19,6 +23,11 @@ fn main() -> Result<()> {
                     .required(true),
             ),
         )
+        .subcommand(
+            Command::new("reset")
+                .about("Reset the vault")
+                .subcommand(Command::new("master").about("Reset the master password")),
+        )
         .arg_required_else_help(true)
         .get_matches();
 
@@ -27,14 +36,27 @@ fn main() -> Result<()> {
             let config = AppConfig::from_matches(sub_matches);
             println!("Logging in as: {}", config.username);
 
-            // As for password using rpassword crate
-            let password = rpassword::prompt_password("Password: ")?;
-            println!("Password: {}", password);
+            let expected_password = rustic_key_vault::create_or_get_master_password()?;
+            println!("Expected password: {}", expected_password);
 
-            get_passwords()?;
+            // Check for password file
+            let _password_file = rustic_key_vault::get_passwords()?;
+        }
+        Some(("reset", reset_matches)) => {
+            if reset_matches.subcommand_matches("master").is_some() {
+                if am_i_root() {
+                    println!("System password verified as root.");
+                } else {
+                    println!("Failed to verify system password as root. Please run as 'sudo'.");
+                }
+            } else {
+                // Tell user to use 'master' subcommand
+                println!("Use 'master' subcommand to reset the master password.")
+            }
         }
         _ => {
             println!("No subcommand was used");
+            // root privileges required
         }
     }
 
