@@ -113,23 +113,24 @@ impl AppConfig {
                 return Err(anyhow::anyhow!("Password cannot be empty"));
             }
 
-            let salt = SaltString::generate(&mut OsRng);
+            let (password_hash, password_file) = Self::create_password_hash(hash_file, password)?;
 
-            // 'Argon2id' with default parameters
-            let argon2 = Argon2::default();
-
-            // Hash password to PHC string ($argon2id$v=19$...)
-            let password_hash = argon2
-                .hash_password(password.as_bytes(), &salt)
-                .unwrap()
-                .to_string();
-
-            // create passwords.json.enc file
-            let password_file = Self::create_or_get_password_file()?;
-
-            // Write the hash to the hash file
-            fs::write(&hash_file, &password_hash).context("Failed to write hash to file")?;
-            println!("Master password is set. Please enter the master password to continue.");
+            // let salt = SaltString::generate(&mut OsRng);
+            //
+            // // 'Argon2id' with default parameters
+            // let argon2 = Argon2::default();
+            //
+            // // Hash password to PHC string ($argon2id$v=19$...)
+            // let password_hash = argon2
+            //     .hash_password(password.as_bytes(), &salt)
+            //     .unwrap()
+            //     .to_string();
+            //
+            // // create passwords.json.enc file
+            // let password_file = Self::create_or_get_password_file()?;
+            //
+            // // Write the hash to the hash file
+            // fs::write(&hash_file, &password_hash).context("Failed to write hash to file")?;
 
             Ok((password_hash, password_file))
         } else {
@@ -143,6 +144,28 @@ impl AppConfig {
     pub fn password_prompt() -> Result<String> {
         let password = rpassword::prompt_password("Master Password: ")?;
         Ok(password)
+    }
+
+    pub fn create_password_hash(hash_file: PathBuf, password: String) -> Result<(String, PathBuf)> {
+        let salt = SaltString::generate(&mut OsRng);
+
+        // 'Argon2id' with default parameters
+        let argon2 = Argon2::default();
+
+        // Hash password to PHC string ($argon2id$v=19$...)
+        let password_hash = argon2
+            .hash_password(password.as_bytes(), &salt)
+            .unwrap()
+            .to_string();
+
+        // create passwords.json.enc file
+        let password_file = Self::create_or_get_password_file()?;
+
+        // Write the hash to the hash file
+        fs::write(&hash_file, &password_hash).context("Failed to write hash to file")?;
+        println!("Master password is set. Please enter the master password to continue.");
+
+        Ok((password_hash, password_file))
     }
 
     pub fn match_password(password: &[u8], password_hash: &str) -> Result<bool> {
