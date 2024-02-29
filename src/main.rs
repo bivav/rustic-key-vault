@@ -38,6 +38,12 @@ fn main() -> Result<()> {
 
             // while count < 3, ask for password prompt
             while count < 3 && !matched_password {
+                if count == 3 {
+                    return Err(anyhow::anyhow!(
+                        "You have exceeded the maximum number of attempts"
+                    ));
+                }
+
                 let password = AppConfig::password_prompt()?;
 
                 if password.trim().is_empty() {
