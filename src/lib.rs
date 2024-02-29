@@ -1,5 +1,6 @@
 use std::fs;
 use std::fs::OpenOptions;
+use std::io::Write;
 use std::os::unix::fs::PermissionsExt;
 use std::path::PathBuf;
 
@@ -8,6 +9,12 @@ use argon2::password_hash::rand_core::OsRng;
 use argon2::password_hash::SaltString;
 use argon2::{Argon2, PasswordHash, PasswordHasher, PasswordVerifier};
 use nix::unistd;
+use prettytable::{row, Table};
+use serde::{Deserialize, Serialize};
+
+use crate::password_manager::PasswordEntry;
+
+mod password_manager;
 
 pub struct AppConfig {
     pub username: String,
@@ -78,7 +85,6 @@ impl AppConfig {
 
     pub fn create_or_get_password_file() -> Result<PathBuf> {
         let app_dir = Self::get_app_dir()?;
-
         let password_file = app_dir.join("passwords.json.enc");
 
         OpenOptions::new()
@@ -146,18 +152,20 @@ impl AppConfig {
             .is_ok())
     }
 
-    // read_password_file
-    pub fn read_password_file(password_file: &PathBuf) -> Result<()> {
-        let file = OpenOptions::new()
-            .read(true)
-            .open(password_file)
-            .context("Failed to open password file")?;
+    pub fn read_password_file(password_file: &PathBuf) -> Result<Vec<PasswordEntry>> {
+        // read the content of the password file
+        let content = fs::read_to_string(&password_file).context("Failed to read password file")?;
 
-        let reader = std::io::BufReader::new(file);
-        let passwords: Vec<String> =
-            serde_json::from_reader(reader).context("Failed to read password file")?;
-        println!("Passwords: {:?}", passwords);
-        Ok(())
+        // check if the content is empty
+        if content.trim().is_empty() {
+            return Ok(Vec::new());
+        }
+
+        // deserialize the JSON array into a Vec<String>
+        let passwords: Vec<PasswordEntry> =
+            serde_json::from_str(&content).context("Failed to parse JSON")?;
+
+        Ok(passwords)
     }
 
     // match the choice from user
@@ -165,18 +173,81 @@ impl AppConfig {
         match choice.trim() {
             "1" => {
                 println!("Add a new password");
+
+                let user_input = PasswordEntry::prompt().context("Failed to get user input")?;
+
+                let new_entry = PasswordEntry::new(
+                    user_input.id,
+                    user_input.username,
+                    user_input.password,
+                    user_input.domain,
+                );
+
+                // get the password file
+                let password_file = Self::create_or_get_password_file()?;
+
+                // read the password file
+                let mut passwords: Vec<PasswordEntry> =
+                    AppConfig::read_password_file(&password_file)?;
+                println!("List of passwords: {:?}", passwords);
+
+                // add the new entry to the list of passwords
+                passwords.push(new_entry);
+                println!("Updated the list of passwords: {:?}", passwords);
+
+                // serialize the passwords vector into a JSON array
+                let passwords_json = serde_json::to_string(&passwords).unwrap();
+
+                // insert to password file
+                let mut file = OpenOptions::new()
+                    .write(true)
+                    .open(&password_file)
+                    .context("Failed to open password file")?;
+
+                // store the passwords in file as json array
+                file.write_all(passwords_json.as_bytes())
+                    .context("Failed to write to password file")?;
             }
             "2" => {
-                println!("Get a password");
+                println!("Search for a password using Domain: ");
+                println!("Search for a password using domain name");
+                write!(std::io::stdout(), "Enter domain name: ")?;
+                std::io::stdout().flush()?;
+                let mut domain = String::new();
+                std::io::stdin()
+                    .read_line(&mut domain)
+                    .context("Failed to read domain name")?;
+
+                println!("Domain: {}", domain.trim());
             }
             "3" => {
                 println!("Update a password");
+                unimplemented!("Will be implemented in the next chapter")
             }
             "4" => {
                 println!("Delete a password");
+                unimplemented!("Will be implemented in the next chapter")
             }
             "5" => {
                 println!("List all passwords");
+                let password_file = Self::create_or_get_password_file()?;
+                // read the password file
+                let passwords = AppConfig::read_password_file(&password_file)?;
+
+                // List all passwords in a table format with auto size
+                let mut table = Table::new();
+                table.add_row(row!["ID", "Username", "Password", "Domain"]);
+
+                for password in passwords {
+                    table.add_row(row![
+                        password.id,
+                        password.username,
+                        password.password,
+                        password.domain
+                    ]);
+                }
+
+                table.printstd();
             }
             "6" => {
                 println!("Exit");
@@ -187,11 +258,4 @@ impl AppConfig {
         }
         Ok(())
     }
-
-}
-
-struct Password {
-    username: String,
-    password: String,
-    domain: String,
 }

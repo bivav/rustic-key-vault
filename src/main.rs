@@ -1,5 +1,3 @@
-use std::io::Write;
-
 use anyhow::{Context, Result};
 use clap::{Arg, Command};
 
@@ -56,38 +54,30 @@ fn main() -> Result<()> {
 
             if matched_password {
                 println!("Login successful");
+                loop {
+                    println!("Choose an option:");
 
-                // List the options for user to choose from
-                println!("Choose an option:");
+                    println!("1. Add a new password");
+                    println!("2. Search for a password");
+                    println!("3. Update a password");
+                    println!("4. Delete a password");
+                    println!("5. List all passwords");
+                    println!("6. Exit");
 
-                println!("Search for a password using domain name");
-                write!(std::io::stdout(), "Enter domain name: ")?;
-                std::io::stdout().flush()?;
-                let mut domain = String::new();
-                std::io::stdin()
-                    .read_line(&mut domain)
-                    .context("Failed to read domain name")?;
+                    // Get user's choice
+                    let mut choice = String::new();
+                    std::io::stdin()
+                        .read_line(&mut choice)
+                        .context("Failed to read user's choice")?;
 
-                println!("Domain: {}", domain.trim());
+                    if choice.trim() == "6" {
+                        println!("Exiting the vault");
+                        break;
+                    }
 
-                println!("1. Add a new password");
-                println!("2. Get a password");
-                println!("3. Update a password");
-                println!("4. Delete a password");
-                println!("5. List all passwords");
-                println!("6. Exit");
-
-                // read the password file
-                let passwords = AppConfig::read_password_file(&password_file)?;
-
-                // get the user's choice
-                let mut choice = String::new();
-                std::io::stdin()
-                    .read_line(&mut choice)
-                    .context("Failed to read user's choice")?;
-
-                // match the choice
-                let val = AppConfig::match_choice(&choice)?;
+                    // match the choice
+                    AppConfig::match_choice(&choice)?;
+                }
             } else {
                 println!("Login failed");
             }
