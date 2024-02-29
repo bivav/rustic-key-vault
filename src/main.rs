@@ -1,7 +1,7 @@
 use anyhow::Result;
 use clap::{Arg, Command};
 
-use rustic_key_vault::AppConfig;
+use rustic_key_vault::{match_password, password_prompt, AppConfig};
 
 fn main() -> Result<()> {
     let matches = Command::new("rustic_key_vault")
@@ -32,10 +32,22 @@ fn main() -> Result<()> {
             println!("Logging in as: {}", config.username);
 
             let expected_password = rustic_key_vault::create_or_get_master_password()?;
-            println!("Expected password: {}", expected_password);
+            // println!("Expected password: {}", expected_password);
+
+
+
+            let password = password_prompt()?;
+
+            if password.trim().is_empty() {
+                return Err(anyhow::anyhow!("Password cannot be empty"));
+            }
+
+            let val = match_password(&password.as_bytes(), &expected_password)?;
+
+            println!("Password match: {}", val);
 
             // Check for password file
-            let _password_file = rustic_key_vault::get_passwords()?;
+            // let _password_file = rustic_key_vault::get_passwords()?;
         }
         Some(("reset", reset_matches)) => {
             if reset_matches.subcommand_matches("master").is_some() {
