@@ -1,14 +1,26 @@
 use anyhow::{Context, Result};
 use clap::{Arg, Command};
 
+use crate::crypto_utils::EncryptDecrypt;
+use crate::file_io::FileIoOperation;
 use rustic_key_vault::*;
+use vault::KeyVaultManager;
+
+mod crypto_utils;
+mod file_io;
+mod vault;
+
+const APP_NAME: &str = "Rustic Key Vault";
+const APP_VERSION: &str = "0.1.0";
+const APP_AUTHOR: &str = "Bivav R Satyal";
+const APP_ABOUT: &str = "A secure password vault for storing your passwords locally.";
 
 fn main() -> Result<()> {
     let matches = Command::new("rustic_key_vault")
-        .name("Rustic Key Vault")
-        .version("0.1.0")
-        .about("A secure password vault for storing your passwords locally.")
-        .author("Bivav R Satyal")
+        .name(APP_NAME)
+        .version(APP_VERSION)
+        .about(APP_ABOUT)
+        .author(APP_AUTHOR)
         .subcommand(
             Command::new("login").about("Login to the vault").arg(
                 Arg::new("username")
@@ -31,31 +43,30 @@ fn main() -> Result<()> {
             let config = AppConfig::from_matches(sub_matches);
             println!("Logging in as: {}", config.username);
 
-            let (expected_password, _) = AppConfig::create_or_get_master_password()?;
+            let (expected_password, _) = FileIoOperation::create_or_get_master_password()?;
 
             let mut count = 0;
             let mut matched_password = false;
 
-            // while count < 3, ask for password prompt
             while count < 3 && !matched_password {
-                if count == 3 {
-                    return Err(anyhow::anyhow!(
-                        "You have exceeded the maximum number of attempts"
-                    ));
-                }
-
-                let password = AppConfig::password_prompt()?;
+                let password = KeyVaultManager::password_prompt()?;
 
                 if password.trim().is_empty() {
                     return Err(anyhow::anyhow!("Password cannot be empty"));
                 }
-                let val = AppConfig::match_password(&password.as_bytes(), &expected_password)?;
-                if val {
+
+                if KeyVaultManager::match_password(&password.as_bytes(), &expected_password)? {
                     matched_password = true;
                 } else {
                     println!("Password does not match. Please try again.");
                     count += 1;
                 }
+            }
+
+            if count == 3 {
+                return Err(anyhow::anyhow!(
+                    "You have exceeded the maximum number of attempts"
+                ));
             }
 
             if matched_password {
@@ -102,15 +113,15 @@ fn main() -> Result<()> {
 
                     // check for Y or y
                     if choice.trim().to_lowercase() == "y" {
-                        let hash_file = AppConfig::create_or_get_hash_file()?;
-                        let new_password = AppConfig::password_prompt()?;
+                        let hash_file = FileIoOperation::create_or_get_hash_file()?;
+                        let new_password = KeyVaultManager::password_prompt()?;
                         let new_password = new_password.trim();
 
                         if new_password.is_empty() {
                             return Err(anyhow::anyhow!("Password cannot be empty"));
                         }
 
-                        AppConfig::create_password_hash(hash_file, new_password.to_string())?;
+                        EncryptDecrypt::create_password_hash(hash_file, new_password.to_string())?;
 
                         println!("Master password reset successful");
                     } else {
