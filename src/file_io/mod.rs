@@ -60,7 +60,7 @@ impl FileIoOperation {
         Ok(password_file)
     }
 
-    pub fn create_or_get_master_password() -> anyhow::Result<(String, PathBuf)> {
+    pub fn create_or_get_master_password(username: String) -> anyhow::Result<(String, PathBuf)> {
         let hash_file = Self::create_or_get_hash_file()?;
 
         let hash = fs::read_to_string(&hash_file).context("Failed to read hash file")?;
@@ -73,7 +73,8 @@ impl FileIoOperation {
                 return Err(anyhow::anyhow!("Password cannot be empty"));
             }
 
-            let (password_hash, password_file) = EncryptDecrypt::create_password_hash(hash_file, password)?;
+            let (password_hash, password_file) =
+                EncryptDecrypt::create_password_hash(hash_file, username, password)?;
 
             Ok((password_hash, password_file))
         } else {

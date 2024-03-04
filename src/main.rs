@@ -1,10 +1,11 @@
 use anyhow::{Context, Result};
 use clap::{Arg, Command};
 
-use crate::crypto_utils::EncryptDecrypt;
-use crate::file_io::FileIoOperation;
 use rustic_key_vault::*;
 use vault::KeyVaultManager;
+
+use crate::crypto_utils::EncryptDecrypt;
+use crate::file_io::FileIoOperation;
 
 mod crypto_utils;
 mod file_io;
@@ -41,9 +42,9 @@ fn main() -> Result<()> {
     match matches.subcommand() {
         Some(("login", sub_matches)) => {
             let config = AppConfig::from_matches(sub_matches);
-            println!("Logging in as: {}", config.username);
+            println!("Logging in as: {}", &config.username);
 
-            let (expected_password, _) = FileIoOperation::create_or_get_master_password()?;
+            let (expected_password, _) = FileIoOperation::create_or_get_master_password(config.username.clone())?;
 
             let mut count = 0;
             let mut matched_password = false;
@@ -55,7 +56,9 @@ fn main() -> Result<()> {
                     return Err(anyhow::anyhow!("Password cannot be empty"));
                 }
 
-                if KeyVaultManager::match_password(&password.as_bytes(), &expected_password)? {
+                let password_fmt = format!("{}:{}", &config.username, &password);
+
+                if KeyVaultManager::match_password(&password_fmt.as_bytes(), &expected_password)? {
                     matched_password = true;
                 } else {
                     println!("Password does not match. Please try again.");
@@ -121,7 +124,14 @@ fn main() -> Result<()> {
                             return Err(anyhow::anyhow!("Password cannot be empty"));
                         }
 
-                        EncryptDecrypt::create_password_hash(hash_file, new_password.to_string())?;
+                        // TODO: Add a feature to get username from the user
+                        // let password_fmt = format!("{}:{}", "root", new_password);
+
+                        EncryptDecrypt::create_password_hash(
+                            hash_file,
+                            "root".to_string(),
+                            new_password.to_string(),
+                        )?;
 
                         println!("Master password reset successful");
                     } else {
