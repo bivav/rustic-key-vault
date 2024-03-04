@@ -6,8 +6,8 @@ use argon2::PasswordHasher;
 use nix::unistd;
 use prettytable::{row, Table};
 
-use crate::file_io::FileIoOperation;
-use crate::vault::KeyVaultManager;
+use file_io::FileIoOperation;
+use vault::KeyVaultManager;
 
 mod crypto_utils;
 mod file_io;
